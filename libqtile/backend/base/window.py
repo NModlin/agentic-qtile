@@ -250,6 +250,33 @@ class Window(_Window, metaclass=ABCMeta):
     def __repr__(self):
         return f"{self.__class__.__name__!s}(name={self.name!r}, wid={self.wid:d})"
 
+    # --- Agentic Qtile: Agent metadata for window decorators ---
+    _agent_metadata: dict[str, Any] | None = None
+
+    @property
+    def agent_metadata(self) -> dict[str, Any]:
+        """Agent metadata for this window (e.g. agent_id, confidence, status)."""
+        if self._agent_metadata is None:
+            self._agent_metadata = {}
+        return self._agent_metadata
+
+    @agent_metadata.setter
+    def agent_metadata(self, value: dict[str, Any]) -> None:
+        self._agent_metadata = value
+
+    def draw_agent_overlay(self, ctx: Any = None) -> None:
+        """Draw agent overlay on window border using Cairo.
+
+        Override in backend-specific Window subclasses to render
+        agent metadata (confidence scores, status indicators) on borders.
+
+        Parameters
+        ----------
+        ctx : cairocffi.Context, optional
+            Cairo context to draw on. If None, the method is a no-op.
+        """
+        pass
+
     @property
     @abstractmethod
     def group(self) -> _Group | None:
@@ -336,6 +363,15 @@ class Window(_Window, metaclass=ABCMeta):
 
     def paint_borders(self, color: ColorsType, width: int) -> None:
         """Paint the window borders with the given color(s) and width"""
+
+    def paint_agent_borders(self, color: ColorsType, width: int) -> None:
+        """Paint agent-specific border decorations.
+
+        Called after paint_borders when agent_metadata is set.
+        Subclasses can override to render confidence/status overlays.
+        """
+        if self._agent_metadata:
+            self.draw_agent_overlay()
 
     @abstractmethod
     @expose_command()

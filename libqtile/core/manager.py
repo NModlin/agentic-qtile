@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 import libqtile
 from libqtile import bar, hook, ipc, utils
+from libqtile.agent import AgentBridge
 from libqtile.backend import base
 from libqtile.backend.base.core import Output
 from libqtile.command import interface
@@ -101,6 +102,7 @@ class Qtile(CommandObject):
         self._stopped_event: asyncio.Event = asyncio.Event()
 
         self.server = IPCCommandServer(self)
+        self.agent_bridge = AgentBridge(self)
 
         self.locked = False
         hook.subscribe.locked(self.lock)
@@ -246,6 +248,7 @@ class Qtile(CommandObject):
                     self._prepare_socket_path(self.socket_path),
                     self.server.call,
                 ),
+                self.agent_bridge,
             ):
                 await self._stopped_event.wait()
                 if lifecycle.behavior != lifecycle.behavior.RESTART:
