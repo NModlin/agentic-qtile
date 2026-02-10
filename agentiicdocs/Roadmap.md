@@ -1,4 +1,4 @@
-# Agentic Qtile Roadmap
+# AGENTIC-QTILE Roadmap
 
 ## Phase 1: The "Sensory" Foundation (COMPLETE)
 ✅ Implement AgentBridge (JSON-RPC Socket)

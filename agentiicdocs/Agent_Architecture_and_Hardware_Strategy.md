@@ -1,0 +1,51 @@
+# AGENTIC-QTILE: Architecture & Hardware Strategy
+
+## 1. Agent Definition
+
+In the Agentic Qtile ecosystem, an "Agent" is not a mystical entity; it is a client process that orchestrates the window manager via the AgentBridge.
+
+### The Orchestrator (The "Primary Agent")
+
+- **Role**: The single entry point for user interaction. It maintains the conversation history and the state of the "Draft" layout.
+- **Lifecycle**: Starts when Qtile starts. Persists in the background.
+- **Interface**: Connects to the `agent_bridge.socket` to issue commands.
+
+## 2. Skill Acquisition Strategy
+
+We avoid "Agent Sprawl" (creating a new agent for every small task). Instead, we use a **Dynamic Tool Registry**.
+
+- **What is a Skill?** A Skill is a Python function decorated with `@skill` that returns a JSON-serializable result.
+- **Discovery**: The Orchestrator scans a `skills/` directory on startup.
+- **Usage**:
+  1. User types: "Check my system load."
+  2. LLM analyzes available tools. Matches "Check system load" to `get_system_stats()`.
+  3. LLM outputs JSON: `{"tool": "get_system_stats", "args": {}}`.
+  4. Orchestrator executes function and feeds result back to LLM.
+  5. LLM generates natural language response: "Your CPU is at 15%."
+
+## 3. Hybrid Inference Model (Hardware Strategy)
+
+### Tier 1: The "Cortex" (Local)
+
+- **Hardware**: NVIDIA RTX 3060 (12GB VRAM).
+- **Model**: `llama3:8b-instruct-q6_K` or `mistral-nemo`.
+- **Responsibility**: High-frequency, low-latency UI manipulation.
+  - Parsing user intent ("Move that window").
+  - Drafting ghost slots.
+  - Verifying task completion (Ralph Wiggin Protocol).
+- **Why**: We cannot afford API latency when moving windows. It must feel instant.
+
+### Tier 2: The "Cloud" (Optional Escalation)
+
+- **Provider**: Google Gemini API (via API Key) or OpenAI.
+- **Responsibility**: "Deep Work."
+  - Writing complex code.
+  - Summarizing long documents.
+  - Broad internet research.
+- **Trigger**: The Local Agent decides it cannot fulfill a request and asks the user, "This requires complex research. Shall I use the Cloud Brain?"
+
+## 4. Implementation Roadmap
+
+- `scripts/orchestrator.py`: The main loop connecting Ollama to AgentBridge.
+- `libqtile/agent_skills.py`: A module containing the standard library of skills (WM control, System stats).
+- **Ollama Config**: Ensure the server is running with `OLLAMA_HOST=0.0.0.0` if accessing from a different machine in the cluster.

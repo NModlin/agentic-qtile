@@ -1,4 +1,4 @@
-# Software Design Document (SDD) - Agentic Qtile
+# Software Design Document (SDD) - AGENTIC-QTILE
 
 ## 1. System Architecture
 
@@ -35,14 +35,11 @@ The `AgentBridge` exposes the following methods:
 - `clear_ghost_slots()`: Clears pending proposals.
 - `get_recent_events(n=100)`: Returns the last N events from the log for context.
 
-### Lifecycle
-- `verify_completion(window_id, complete)`: Ralph Wiggin Protocol.
-
 ---
 
 ## 3. Learning Schema (WM_OBSERVER)
 
-Events are logged to `~/.cache/qtile/agent_events.jsonl`.
+Events are logged to `~/.cache/qtile/agent_events.jsonl` to facilitate Few-Shot Learning.
 
 ### Event Structure
 ```json
@@ -54,16 +51,12 @@ Events are logged to `~/.cache/qtile/agent_events.jsonl`.
 ```
 
 ### Key Events
-- `client_new`, `client_killed`, `focus_change`
-- `agent_metadata_set`
-- `slot_created`, `slot_removed`
-- **New for Phase 3**:
-  - `ghost_slot_proposed`: Triggered by `propose_slot`.
-  - `layout_confirmed`: Triggered by user approval.
-  - `user_override`: Triggered when a user manually closes an agent-managed window or slot, or moves a window out of a slot. Payload includes `agent_id` to correlate with the agent's intent.
+- `ghost_slot_proposed`: Context for what the agent *tried* to do.
+- `layout_confirmed`: Context for what the user *accepted*.
+- `user_override`: Triggered when a user manually closes an agent-managed window or slot. Payload includes `agent_id` to correlate which agent's decision was rejected.
 
-### Few-Shot Learning
-The `orchestrator.py` script will read `user_override` events from `get_recent_events` and include them in the LLM prompt as "Negative Examples" to avoid repeating rejected layouts.
+### Few-Shot Learning Strategy
+The Orchestrator reads `user_override` events via `get_recent_events()` and injects them into the LLM prompt as "Negative Examples" (e.g., "User rejected this layout last time").
 
 ---
 

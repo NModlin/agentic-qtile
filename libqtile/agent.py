@@ -48,13 +48,10 @@ class AgentBridge:
             "get_agent_metadata": self._rpc_get_agent_metadata,
             "focus_window": self._rpc_focus_window,
             "create_slot": self._rpc_create_slot,
+            "propose_slot": self._rpc_propose_slot,
             "remove_slot": self._rpc_remove_slot,
             "list_slots": self._rpc_list_slots,
             "verify_completion": self._rpc_verify_completion,
-            "propose_slot": self._rpc_propose_slot,
-            "confirm_layout": self._rpc_confirm_layout,
-            "clear_ghost_slots": self._rpc_clear_ghost_slots,
-            "get_recent_events": self._rpc_get_recent_events,
         }
 
         # Subscribe to hooks for WM_OBSERVER
@@ -75,24 +72,10 @@ class AgentBridge:
         })
 
     def _on_client_killed(self, client):
-        payload = {
+        self._log_event("client_killed", {
             "window_id": client.window.wid,
             "name": client.name,
-        }
-        
-        # Check for User Override (Ralph Wiggin Violation)
-        if client.window.wid in self._pending_close:
-            pending_info = self._pending_close.get(client.window.wid, {})
-            # Log as user override
-            self._log_event("user_override", {
-                "reason": "forced_close_during_pending_verification",
-                "window_id": client.window.wid,
-                "agent_id": pending_info.get("agent_id", "unknown"),
-            })
-            # Clean up pending
-            del self._pending_close[client.window.wid]
-
-        self._log_event("client_killed", payload)
+        })
 
     def _on_focus_change(self):
         client = self.qtile.current_window
@@ -182,13 +165,12 @@ class AgentBridge:
         ]
 
     def _rpc_get_layout(self, params):
-        """Current layout info."""
+        """Return the current layout info."""
         layout = self.qtile.current_layout
-        if not layout:
-             return {}
-        info = layout.info()
-        info["group"] = self.qtile.current_group.name
-        return info
+        return {
+            "name": layout.name,
+            "group": self.qtile.current_group.name,
+        }
 
     def _rpc_get_focused(self, params):
         """Return info about the currently focused window."""
@@ -245,7 +227,7 @@ class AgentBridge:
     def _rpc_create_slot(self, params):
         """Create a semantic slot in the current GenerativeLayout.
 
-        Params: {"name": str, "x": float, "y": float, "w": float, "h": float, "owner": str}
+        Params: {"name": str, "x": float, "y": float, "w": float, "h": float}
         All coords are fractional (0.0-1.0).
         """
         layout = self.qtile.current_layout
@@ -257,7 +239,22 @@ class AgentBridge:
             params.get("y", 0.0),
             params.get("w", 0.3),
             params.get("h", 0.3),
-            params.get("owner", "system"),
+        )
+
+    def _rpc_propose_slot(self, params):
+        """Propose a 'Ghost Slot' (Draft Mode) without committing layout changes.
+        
+        Params: Same as create_slot.
+        """
+        layout = self.qtile.current_layout
+        if not hasattr(layout, "propose_slot"):
+            raise ValueError("Current layout does not support draft mode")
+        return layout.propose_slot(
+            params["name"],
+            params.get("x", 0.0),
+            params.get("y", 0.0),
+            params.get("w", 0.3),
+            params.get("h", 0.3),
         )
 
     def _rpc_remove_slot(self, params):
@@ -276,58 +273,6 @@ class AgentBridge:
         if not hasattr(layout, "list_slots"):
             raise ValueError("Current layout does not support semantic slots")
         return layout.list_slots()
-        
-    def _rpc_propose_slot(self, params):
-        """Propose a Ghost Slot (Phase 3 Draft Mode).
-        
-        Params: {"name": str, "x": float, "y": float, "w": float, "h": float, "owner": str}
-        """
-        layout = self.qtile.current_layout
-        if not hasattr(layout, "propose_slot"):
-             raise ValueError("Current layout does not support ghost slots")
-        self._log_event("ghost_slot_proposed", params)
-        return layout.propose_slot(
-            params["name"],
-            params.get("x", 0.0),
-            params.get("y", 0.0),
-            params.get("w", 0.3),
-            params.get("h", 0.3),
-            params.get("owner", "system"),
-        )
-
-    def _rpc_confirm_layout(self, params):
-        """Confirm all ghost slots and promote them to real slots."""
-        layout = self.qtile.current_layout
-        if not hasattr(layout, "confirm_slots"):
-             raise ValueError("Current layout does not support ghost slots")
-        count = layout.confirm_slots()
-        self._log_event("layout_confirmed", {"slot_count": count})
-        return {"confirmed": count}
-        
-    def _rpc_clear_ghost_slots(self, params):
-        """Clear all ghost slots."""
-        layout = self.qtile.current_layout
-        if not hasattr(layout, "clear_ghost_slots"):
-             return {"ok": False}
-        layout.clear_ghost_slots()
-        return {"ok": True}
-
-    def _rpc_get_recent_events(self, params):
-        """Get the last N events from the JSONL log.
-        
-        Params: {"n": int (default 100)}
-        """
-        n = params.get("n", 100)
-        events = []
-        try:
-            with open(self.event_log_path, "r") as f:
-                # Read all lines efficiently
-                # For very large files, 'deque(f, n)' is better
-                from collections import deque
-                events = [json.loads(line) for line in deque(f, n)]
-        except OSError:
-            pass
-        return events
 
     def _rpc_verify_completion(self, params):
         """Ralph Wiggin Protocol: Mark a window's task as complete or incomplete.
@@ -352,12 +297,7 @@ class AgentBridge:
             self._log_event("ralph_wiggin_complete", {"window_id": wid})
         else:
             # Keep the window alive; agent needs another iteration
-            # Store metadata if available to track agent ID
-            agent_id = "unknown"
-            if hasattr(win, "agent_metadata") and win.agent_metadata:
-                 agent_id = win.agent_metadata.get("agent_id", "unknown")
-            
-            self._pending_close[wid] = {"status": "pending", "window_id": wid, "agent_id": agent_id}
+            self._pending_close[wid] = {"status": "pending", "window_id": wid}
             if hasattr(win, "agent_metadata"):
                 win.agent_metadata["status"] = "iterating"
             self._log_event("ralph_wiggin_retry", {"window_id": wid})

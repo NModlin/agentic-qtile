@@ -1,8 +1,16 @@
 |logo|
 
+AGENTIC-QTILE
+=============
+
 **A full-featured, hackable tiling window manager written and configured in Python**
 
 |website| |pypi| |ci| |rtd| |license| |ruff| |coverage|
+
+Based on Qtile
+==============
+
+This project is a fork/evolution of **Qtile**, a fantastic tiling window manager. Huge thanks to the original Qtile development team and community for their incredible work.
 
 Features
 ========
@@ -51,7 +59,7 @@ Please also consider submitting useful scripts etc. to the qtile-examples repo
 .. _`tips & tricks`: https://docs.qtile.org/en/latest/manual/hacking.html
 .. _`guidelines`: https://docs.qtile.org/en/latest/manual/contributing.html
 
-.. |logo| image:: https://raw.githubusercontent.com/qtile/qtile/master/libqtile/resources/logo.png
+.. |logo| image:: docs/_static/agentic-qtile-logo.jpg
     :alt: Logo
     :target: https://qtile.org
 .. |website| image:: https://img.shields.io/badge/website-qtile.org-blue.svg

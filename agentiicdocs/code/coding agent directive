@@ -1,0 +1,99 @@
+Directive: Agentic Qtile System Evolution (Phase 3)
+
+1. Context & Objective
+
+You are tasked with advancing the Agentic Qtile project—a fork of the Qtile window manager designed for autonomous AI agents. We have successfully completed Phase 2 (Bridge Infrastructure & Generative Layout Logic). We are now entering Phase 3: Conversational UI Orchestration & Preference Learning.
+
+The goal is to transform the WM into a "generative partner." When a user boots, they encounter a prompt. Upon a request like "Computer, research X," the agent processes the intent, calculates a UI requirement via the GAD Framework, and generates an ephemeral Agent2UI layout. The user can then refine this layout through dialogue, and the system must learn these preferences via the WM_OBSERVER logs.
+
+2. Mandatory Document Updates
+
+Before implementing code, update the following files in agentiicdocs/:
+
+A. SRS (Software Requirements Specification)
+
+Add FR-5 (Conversational Orchestrator): The WM must provide a primary input hook for natural language intent.
+
+Add FR-6 (Layout Drafting/Preview): The WM must support a "Draft Mode" where proposed slots are rendered as transparent Cairo overlays before being committed.
+
+Add FR-7 (Preference Feedback Loop): The WM must correlate manual window moves/slot deletions with specific agent IDs to build a preference model.
+
+B. SDD (Software Design Document)
+
+Update Architecture: Describe the "Ghost Slot" system—a state where SemanticSlot objects exist in a pending state for user approval.
+
+Update IPC Logic: Detail new JSON-RPC methods: propose_layout, confirm_layout, and get_recent_events (to pipe agent_events.jsonl back to the LLM).
+
+Learning Schema: Define how the agent_events.jsonl should be structured to facilitate "Few-Shot" learning for the agent's next session.
+
+C. Roadmap
+
+Mark Phase 1 & 2 as 100% Complete.
+
+Define Phase 3 (Current): "The Dialogic Interface." Focus on intent parsing, draft rendering, and preference persistence.
+
+Define Phase 4 (Future): "Multi-Agent Swarms." Collaborative layouts where multiple agents compete/cooperate for screen real estate.
+
+3. Implementation Tasks
+
+Phase 1 & 2 Polishing (Cleanup)
+
+Ensure libqtile/layout/generative.py correctly handles the vertical stack for windows not assigned to a slot.
+
+Verify that AgentBridge.is_close_allowed correctly implements the Ralph Wiggin Protocol (preventing window closure until a "success" condition is verified by the agent).
+
+Phase 3 New Features
+
+Ghost Slot Rendering:
+
+Extend GenerativeLayout to support self.ghost_slots.
+
+Implement a draw loop in libqtile/backend/base/drawer.py (or similar) to render these as semi-transparent rectangles with labels.
+
+The "Draft" Method:
+
+Add an RPC method propose_slot(name, x, y, w, h) that adds to ghost_slots instead of slots.
+
+The Orchestrator Script:
+
+Create scripts/orchestrator.py. This script should act as the "Brain."
+
+It should: 1. Prompt the user for a goal. 2. Use an LLM (mocked for now or using the Gemini API) to generate propose_slot calls. 3. Listen for a "User Approved" keybinding to convert ghosts to real slots.
+
+Preference Logging:
+
+Enhance AgentBridge._log_event to specifically tag "user_override" events whenever a user manually closes a window an agent tried to keep open.
+
+4. Technical Constraints
+
+Language: Python 3.11+.
+
+Graphics: Use cairocffi for all overlay rendering (FR-1 compliance).
+
+IPC: Stick to JSON-RPC 2.0 over the existing Unix socket.
+
+Safety: Ensure FR-2 (Sandboxed Execution) is respected—agent-spawned windows must be tagged in agent_metadata so they can be mass-killed if the user "Rejects" the layout.
+
+5. Success Criteria
+
+The user can type a command.
+
+The screen shows "Proposed Layout" overlays.
+
+A single command/keybinding commits that layout.
+
+Any manual change is recorded in agent_events.jsonl with enough context for an LLM to understand why the user changed it.
+
+6. Reference Implementation (Files in /agentiicdocs/code/)
+
+You have access to the following 5 files located in /agentiicdocs/code/. These files constitute the baseline for Phase 3. You must merge these into the main repository structure:
+
+agent.py: The updated AgentBridge implementing the new RPC methods (propose_slot) and the Ralph Wiggin Protocol logic.
+
+generative.py: The updated Layout engine featuring the ghost_slots dictionary and draft mode logic.
+
+orchestrator.py: The new Python script acting as the "Brain," configured to connect to the Tailscale/Ollama instance.
+
+Agent_Architecture_and_Hardware_Strategy.md: The architectural strategy document defining the hybrid inference model (Local RTX 3060 + Cloud).
+
+agent_instruction_prompt.md: This directive file itself.

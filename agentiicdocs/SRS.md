@@ -1,4 +1,4 @@
-# Software Requirements Specification (SRS) - Agentic Qtile
+# Software Requirements Specification (SRS) - AGENTIC-QTILE
 
 ## Functional Requirements
 
@@ -15,13 +15,13 @@ The WM must provide a JSON-RPC interface over a Unix domain socket to allow exte
 The WM must support dynamic "Semantic Slots" where agents can request screen real estate. These slots are temporary and managed by the agent's lifecycle.
 
 ### FR-5: Conversational Orchestrator
-The WM must provide a primary input hook for natural language intent. This allows the user to initiate complex tasks via text commands (e.g., "Research X"), which the system translates into UI actions.
+The WM must provide a primary input hook for natural language intent. This allows the user to initiate complex tasks via text commands.
 
-### FR-6: Layout Drafting & Preview ("Ghost Slots")
-The WM must support a "Draft Mode" where proposed Semantic Slots are rendered as semi-transparent, labeled overlays (via Cairo) before being committed. This allows the user to visualize the agent's proposed changes before they take effect.
+### FR-6: Layout Drafting & Preview
+The WM must support a "Draft Mode" where proposed slots are rendered as transparent Cairo overlays before being committed.
 
 ### FR-7: Preference Feedback Loop
-The WM must log user interactions that override agent decisions (e.g., manually closing a slot, moving a window out of a slot). These events must be correlated with specific Agent IDs to build a preference model for future sessions.
+The WM must correlate manual window moves/slot deletions with specific agent IDs to build a preference model.
 
 ## Phase 4: Multi-Agent Swarms
 

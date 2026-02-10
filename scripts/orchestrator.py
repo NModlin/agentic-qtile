@@ -1,170 +1,166 @@
 #!/usr/bin/env python3
 """
-Agentic Qtile Orchestrator (Phase 3)
-------------------------------------
-This script acts as the "Brain" of the autonomous system.
-It provides a Conversational UI where the user can express high-level intents,
-and the Orchestrator proposes UI layouts (Ghost Slots) for approval.
+The Orchestrator: The 'Brain' of Agentic Qtile.
 
-Usage:
-    python3 scripts/orchestrator.py
+This script runs efficiently on local hardware (e.g., RTX 3060).
+It acts as the middleman between:
+1. The User (via a textual prompt or voice - future).
+2. The LLM (Ollama running locally).
+3. The Window Manager (via AgentBridge socket).
 """
 import asyncio
 import json
-import os
+import logging
 import sys
+import os
+from typing import Any, Callable, Dict
 
-# Constants
-SOCK_PATH = os.path.expanduser("~/.cache/qtile/agent_bridge.socket")
+import aiohttp
 
-import struct
+# Ensure we can import libqtile
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
-async def rpc_call(method, params=None):
-    """Send JSON-RPC request and return result.
-    
-    Opens a new connection for each request (required by libqtile.ipc.Server).
-    """
-    if params is None:
-        params = {}
-    
-    try:
-        reader, writer = await asyncio.open_unix_connection(SOCK_PATH)
-    except Exception as e:
-        print(f"❌ Connection failed: {e}")
-        return None
+from libqtile.ipc import Client
 
-    req = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params,
-        "id": 1,
-    }
-    
-    try:
-        msg = json.dumps(req).encode()
-        writer.write(msg)
-        writer.write_eof()
-        await writer.drain()
-        
-        data = await reader.read()
-    except Exception as e:
-        print(f"❌ IO Error: {e}")
-        return None
-    finally:
-        writer.close()
+# Configuration
+# Updated for Tailscale: pointing to 'madhatter' via Magic DNS
+OLLAMA_URL = "http://madhatter:11434/api/generate"
+OLLAMA_MODEL = "llama3"  # Or "mistral-nemo", "gemma:7b"
+AGENT_SOCK_NAME = "agent_bridge.socket"
+CACHE_DIR = os.path.expanduser("~/.cache/qtile")
+SOCKET_PATH = os.path.join(CACHE_DIR, AGENT_SOCK_NAME)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("orchestrator")
+
+class SkillRegistry:
+    """Manages the 'Skills' (Tools) the agent can use."""
+    def __init__(self):
+        self.skills: Dict[str, Callable] = {}
+        self.descriptions: Dict[str, str] = {}
+
+    def register(self, name: str, description: str):
+        def decorator(func):
+            self.skills[name] = func
+            self.descriptions[name] = description
+            return func
+        return decorator
+
+    def get_system_prompt(self) -> str:
+        """Generates the system prompt listing available tools."""
+        tools_json = json.dumps(self.descriptions, indent=2)
+        return (
+            "You are the Orchestrator for Agentic Qtile. "
+            "You control a Linux Window Manager.\n"
+            "You have access to the following tools (Skills):\n"
+            f"{tools_json}\n\n"
+            "To use a tool, responding STRICTLY in this JSON format:\n"
+            "{\"tool\": \"tool_name\", \"args\": { ... }}\n"
+            "If no tool is needed, respond with plain text."
+        )
+
+# Initialize Registry
+registry = SkillRegistry()
+
+# --- Define Skills ---
+
+@registry.register("create_slot", "Create a UI slot. Args: name (str), x (float), y (float), w (float), h (float)")
+async def skill_create_slot(client: Client, args: dict):
+    return client.send_command("create_slot", args)
+
+@registry.register("list_windows", "List all open windows. No args.")
+async def skill_list_windows(client: Client, args: dict):
+    return client.send_command("get_windows", {})
+
+@registry.register("draft_layout", "Propose a layout using Ghost Slots (Draft Mode). Args: slots (list of dicts)")
+async def skill_draft_layout(client: Client, args: dict):
+    # This aligns with the new Phase 3 requirement for "Draft Mode"
+    # We map this to a sequence of propose_slot calls
+    results = []
+    for slot in args.get("slots", []):
+        res = client.send_command("propose_slot", slot)
+        results.append(res)
+    return {"proposed": len(results), "status": "Draft rendered. Waiting for user confirmation."}
+
+# --- Main Orchestrator Loop ---
+
+async def query_ollama(prompt: str, system_prompt: str) -> str:
+    """Send request to local Ollama instance."""
+    async with aiohttp.ClientSession() as session:
+        payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "system": system_prompt,
+            "stream": False,
+            "format": "json" # Force JSON mode for reliability on 3060
+        }
         try:
-           await writer.wait_closed()
-        except:
-           pass
-        
-    if not data:
-        return None
-        
-    try:
-        resp = json.loads(data.decode())
-    except json.JSONDecodeError:
-        print(f"❌ Failed to decode response: {data}")
-        return None
-
-    if "error" in resp:
-        print(f"❌ RPC Error: {resp['error']}")
-        return None
-        
-    return resp.get("result")
-
-async def mock_llm_intent(user_input):
-    """Simulate LLM processing of user intent."""
-    print(f"🤖 Processing intent: '{user_input}'...")
-    await asyncio.sleep(0.5) # Simulate thinking
-    
-    user_input = user_input.lower()
-    
-    # Pre-canned scenarios for testing
-    if "research" in user_input:
-        return [
-            {"name": "browser", "x": 0.5, "y": 0.0, "w": 0.5, "h": 0.7},
-            {"name": "notes", "x": 0.5, "y": 0.7, "w": 0.5, "h": 0.3},
-        ]
-    elif "coding" in user_input:
-        return [
-            {"name": "ide", "x": 0.0, "y": 0.0, "w": 0.6, "h": 1.0},
-            {"name": "terminal", "x": 0.6, "y": 0.0, "w": 0.4, "h": 0.5},
-            {"name": "docs", "x": 0.6, "y": 0.5, "w": 0.4, "h": 0.5},
-        ]
-    elif "chat" in user_input:
-         return [
-            {"name": "messaging", "x": 0.7, "y": 0.0, "w": 0.3, "h": 1.0},
-        ]
-    else:
-        # Defaults
-        return [{"name": "assistant", "x": 0.7, "y": 0.0, "w": 0.3, "h": 0.5}]
+            async with session.post(OLLAMA_URL, json=payload) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("response", "")
+                else:
+                    logger.error(f"Ollama Error: {resp.status}")
+                    return ""
+        except Exception as e:
+            logger.error(f"Ollama Connection Failed: {e}")
+            return ""
 
 async def main():
-    if not os.path.exists(SOCK_PATH):
-        print(f"❌ Socket not found at {SOCK_PATH}")
-        print("Ensure Qtile (with AgentBridge) is running.")
-        sys.exit(1)
-        
-    print("✅ Orchestrator Ready.")
-    print("💬 Types commands like 'start research', 'coding mode', or 'chat'. (Ctrl+C to exit)")
+    logger.info(f"🧠 Orchestrator starting. Connecting to {OLLAMA_URL}...")
     
-    try:
-        while True:
-            # 1. Get User Input
-            try:
-                # Use sys.stdin for better pipe handling?
-                # input() uses readline which handles pipes well usually.
-                print("\n👤 User: ", end='', flush=True)
-                prompt = sys.stdin.readline()
-                if not prompt:
-                    break
-                prompt = prompt.strip()
-            except KeyboardInterrupt:
-                break
+    # Connect to Qtile IPC
+    if not os.path.exists(SOCKET_PATH):
+        logger.error(f"❌ Socket not found at {SOCKET_PATH}. Is Qtile running?")
+        return
+
+    client = Client(SOCKET_PATH)
+    
+    print(f"✨ Agentic Qtile Orchestrator Online ({OLLAMA_MODEL})")
+    print("Type your request (or 'exit'):")
+
+    while True:
+        user_input = input("USER> ")
+        if user_input.lower() in ["exit", "quit"]:
+            break
+
+        # 1. Plan
+        system_prompt = registry.get_system_prompt()
+        response_text = await query_ollama(user_input, system_prompt)
+        
+        if not response_text:
+            print("AGENT> [Silence... check Ollama connection]")
+            continue
+
+        # 2. Act (Parse JSON)
+        try:
+            # Llama 3 is chatty, sometimes wraps JSON in markdown
+            clean_json = response_text.replace("```json", "").replace("```", "").strip()
+            action = json.loads(clean_json)
+            
+            tool_name = action.get("tool")
+            tool_args = action.get("args", {})
+            
+            if tool_name in registry.skills:
+                print(f"AGENT> 🛠️ Invoking {tool_name}...")
+                result = await registry.skills[tool_name](client, tool_args)
+                print(f"SYSTEM> {result}")
                 
-            if not prompt:
-                continue
-                
-            if prompt in ["quit", "exit"]:
-                break
-            
-            print(prompt) # Echo input if piped
-
-            # 2. Get Layout Proposal (Mock LLM)
-            proposals = await mock_llm_intent(prompt)
-            print(f"🤖 Agent: I count {len(proposals)} slots needed. Proposing layout...")
-            
-            # 3. Send Proposals (Draft Mode)
-            await rpc_call("clear_ghost_slots")
-            
-            for slot in proposals:
-                res = await rpc_call("propose_slot", slot)
-                if res:
-                    print(f"   Drafted: {slot['name']} at {slot['x']:.2f}")
-
-            # 4. Ask for Confirmation
-            print("🤖 Agent: Do you approve this layout? [Y/n] ", end='', flush=True)
-            confirm = sys.stdin.readline()
-            if not confirm:
-                break
-            confirm = confirm.strip()
-            print(confirm) # Echo input
-
-            if confirm.lower() in ["", "y", "yes"]:
-                res = await rpc_call("confirm_layout")
-                if res:
-                   print(f"✅ Layout confirmed! ({res.get('confirmed')} slots created)")
+                # Optional: Feed result back to LLM for final summary
+                # (omitted for brevity in this demo)
             else:
-                print("❌ Layout rejected.")
-                await rpc_call("clear_ghost_slots")
-                
-            # 5. Check logs for learning (Demo)
-            events = await rpc_call("get_recent_events", {"n": 5})
-            if events:
-                 print(f"   (Learning Context: Read {len(events)} recent events)")
+                print(f"AGENT> {response_text}")
 
-    except KeyboardInterrupt:
-        print("\n👋 Exiting.")
+        except json.JSONDecodeError:
+            # LLM decided to talk instead of act
+            print(f"AGENT> {response_text}")
+        except Exception as e:
+            print(f"AGENT> ⚠️ Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n🛑 Orchestrator shutting down.")
