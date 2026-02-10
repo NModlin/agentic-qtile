@@ -100,8 +100,8 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "Qtile"
-copyright = "2008-2026, the Qtile contributors"
+project = "AGENTIC-QTILE"
+copyright = "2008-2026, the AGENTIC-QTILE contributors"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -233,7 +233,7 @@ html_use_index = True
 # html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "Qtiledoc"
+htmlhelp_basename = "AgenticQtiledoc"
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -250,7 +250,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-    ("index", "Qtile.tex", "Qtile Documentation", "Aldo Cortesi", "manual"),
+    ("index", "AgenticQtile.tex", "AGENTIC-QTILE Documentation", "Aldo Cortesi", "manual"),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -292,10 +292,10 @@ latex_documents = [
 texinfo_documents = [
     (
         "index",
-        "Qtile",
-        "Qtile Documentation",
-        "The Qtile contributors",
-        "Qtile",
+        "AGENTIC-QTILE",
+        "AGENTIC-QTILE Documentation",
+        "The AGENTIC-QTILE contributors",
+        "AGENTIC-QTILE",
         "A hackable tiling window manager.",
         "Miscellaneous",
     ),
