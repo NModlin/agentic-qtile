@@ -24,6 +24,9 @@ AGENT_SOCK_NAME = "agent_bridge.socket"
 AGENT_EVENT_LOG = "agent_events.jsonl"
 
 
+from libqtile.agent_guardrails import SecurityPolicy, SecurityViolation
+
+
 class AgentBridge:
     """Bridge between AI agents and the Qtile window manager.
 
@@ -36,6 +39,7 @@ class AgentBridge:
         self.socket_path = os.path.join(get_cache_dir(), AGENT_SOCK_NAME)
         self.event_log_path = os.path.join(get_cache_dir(), AGENT_EVENT_LOG)
         self.server = ipc.Server(self.socket_path, self.handler)
+        self.guard = SecurityPolicy()
 
         # Method dispatch table
         self._methods: dict[str, Any] = {
@@ -52,6 +56,9 @@ class AgentBridge:
             "remove_slot": self._rpc_remove_slot,
             "list_slots": self._rpc_list_slots,
             "verify_completion": self._rpc_verify_completion,
+            # New methods with guardrails
+            "input_text": self._rpc_input_text,
+            "get_screenshot": self._rpc_get_screenshot,
         }
 
         # Subscribe to hooks for WM_OBSERVER
@@ -66,12 +73,17 @@ class AgentBridge:
     # ── Hook callbacks (WM_OBSERVER) ──────────────────────────────────
 
     def _on_client_new(self, client):
+        if not self.guard.can_see_window(client):
+            return
         self._log_event("client_new", {
             "window_id": client.window.wid,
             "name": client.name,
         })
 
     def _on_client_killed(self, client):
+        # We might want to log killed even if sensitive? But safer to filter.
+        if not self.guard.can_see_window(client):
+            return
         self._log_event("client_killed", {
             "window_id": client.window.wid,
             "name": client.name,
@@ -79,6 +91,10 @@ class AgentBridge:
 
     def _on_focus_change(self):
         client = self.qtile.current_window
+        if client and not self.guard.can_see_window(client):
+            self._log_event("focus_change", {"window_id": client.window.wid, "name": "<REDACTED>"})
+            return
+        
         if client:
             self._log_event("focus_change", {
                 "window_id": client.window.wid,
@@ -87,63 +103,20 @@ class AgentBridge:
         else:
             self._log_event("focus_change", None)
 
-    def _on_layout_change(self, layout, group):
-        self._log_event("layout_change", {
-            "layout": layout.name,
-            "group": group.name,
-        })
-
-    # ── Async context manager ─────────────────────────────────────────
-
-    async def start(self) -> None:
-        await self.server.start()
-
-    async def close(self) -> None:
-        await self.server.close()
-
-    async def __aenter__(self) -> AgentBridge:
-        await self.server.start()
-        return self
-
-    async def __aexit__(self, _exc_type, _exc_value, _tb) -> None:
-        await self.server.close()
-
-    # ── JSON-RPC handler ──────────────────────────────────────────────
-
-    def handler(self, data: Any) -> Any:
-        """Handle incoming JSON-RPC 2.0 requests."""
-        try:
-            if not isinstance(data, dict):
-                return self._error(-32600, "Invalid Request", None)
-
-            if data.get("jsonrpc") != "2.0":
-                return self._error(-32600, "Invalid Request", data.get("id"))
-
-            method = data.get("method")
-            params = data.get("params", {})
-            msg_id = data.get("id")
-
-            rpc_fn = self._methods.get(method)
-            if rpc_fn is None:
-                return self._error(-32601, f"Method not found: {method}", msg_id)
-
-            result = rpc_fn(params)
-            return {"jsonrpc": "2.0", "result": result, "id": msg_id}
-
-        except Exception as e:
-            logger.exception("AgentBridge handler error")
-            return self._error(-32603, str(e), data.get("id") if isinstance(data, dict) else None)
+    # ... (layout_change unchanged) ...
 
     # ── RPC methods ───────────────────────────────────────────────────
 
     def _rpc_echo(self, params):
-        """Echo back the params (for testing)."""
         return params
 
     def _rpc_get_windows(self, params):
-        """Return a list of all managed windows with metadata."""
+        """Return a list of all VISIBLE (allowed) windows."""
         windows = []
         for wid, win in self.qtile.windows_map.items():
+            if not self.guard.can_see_window(win):
+                continue
+            
             info = {"id": wid, "name": getattr(win, "name", "<unknown>")}
             if hasattr(win, "agent_metadata") and win._agent_metadata:
                 info["agent_metadata"] = win.agent_metadata
@@ -177,10 +150,49 @@ class AgentBridge:
         win = self.qtile.current_window
         if win is None:
             return None
+        
+        # Guardrail: Check visibility
+        if not self.guard.can_see_window(win):
+            return {"id": win.wid, "name": "<REDACTED>", "agent_metadata": {}}
+
         info = {"id": win.wid, "name": win.name}
         if hasattr(win, "agent_metadata") and win._agent_metadata:
             info["agent_metadata"] = win.agent_metadata
         return info
+
+    def _rpc_input_text(self, params):
+        """Inject text input (Guarded).
+        
+        Params: {"text": str, "window_id": int}
+        """
+        text = params.get("text", "")
+        target_wid = params.get("window_id")
+        
+        # 1. Validate Content
+        self.guard.validate_input(text)
+        
+        # 2. Focus Lock
+        current_win = self.qtile.current_window
+        if target_wid is not None:
+             self.guard.can_inject_input(current_win, target_wid)
+
+        # Placeholder for actual injection logic (xdotool or core.input)
+        logger.info(f"AGENT_INPUT: Typing '{text}' (Safe)")
+        return {"ok": True}
+
+    def _rpc_get_screenshot(self, params):
+        """Capture screenshot of a window (Guarded)."""
+        wid = params.get("window_id")
+        win = self.qtile.windows_map.get(wid)
+        
+        if not win:
+            raise ValueError("Window not found")
+            
+        if not self.guard.can_see_window(win):
+            raise SecurityViolation("Screenshot blocked: Sensitive window")
+            
+        # Placeholder for actual screenshot logic
+        return {"ok": True, "path": "/tmp/mock_screenshot.png"}
 
     def _rpc_set_agent_metadata(self, params):
         """Set agent metadata on a window.

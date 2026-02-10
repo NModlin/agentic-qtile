@@ -84,6 +84,32 @@ async def skill_draft_layout(client: Client, args: dict):
         results.append(res)
     return {"proposed": len(results), "status": "Draft rendered. Waiting for user confirmation."}
 
+# --- Safe Hands Skills (Phase 4) ---
+
+@registry.register("type_text", "Type text into the focused window. Args: text (str), window_id (int)")
+async def skill_type_text(client: Client, args: dict):
+    # The guardrail logic is inside AgentBridge (backend), but we wrap it here for clarity.
+    try:
+        res = client.send_command("input_text", args)
+        return res
+    except Exception as e:
+        return {"error": f"Security Violation: {e}"}
+
+@registry.register("launch_app", "Launch an application. Args: command (str)")
+async def skill_launch_app(client: Client, args: dict):
+    cmd = args.get("command", "")
+    # Basic client-side check before sending (optional but good practice)
+    if cmd.strip().startswith(("sudo", "rm ", "su ")):
+        return {"error": "Security Violation: Command blocked by client-side guardrail."}
+    
+    # In a real implementation, this would call a new RPC 'spawn_process' 
+    # which would also have server-side guardrails.
+    # For now, we mock it or use qtile's built-in spawn if exposed.
+    # Assuming 'spawn' command is standard in Qtile IPC:
+    # client.send_command("spawn", {"cmd": cmd}) -> Not standard RPC methods in AgentBridge yet.
+    # We will just return a placeholder.
+    return {"status": "Command validated but spawn RPC not implemented yet.", "command": cmd}
+
 # --- Main Orchestrator Loop ---
 
 async def query_ollama(prompt: str, system_prompt: str) -> str:

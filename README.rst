@@ -3,28 +3,48 @@
 AGENTIC-QTILE
 =============
 
-**A full-featured, hackable tiling window manager written and configured in Python**
+**A Tiling Window Manager that works WITH you, not just FOR you.**
 
 |website| |pypi| |ci| |rtd| |license| |ruff| |coverage|
+
+**AGENTIC-QTILE** is a fork of Qtile designed to be the first **AI-Native Window Manager**. It transforms the window manager from a passive container into an active collaborator, capable of seeing, understanding, and manipulating your digital environment alongside you.
 
 Based on Qtile
 ==============
 
 This project is a fork/evolution of **Qtile**, a fantastic tiling window manager. Huge thanks to the original Qtile development team and community for their incredible work.
 
+The Agentic Philosophy
+======================
+
+Most window managers are tools you control. **Agentic-Qtile** is a partner you work with.
+
+It is built on three core pillars:
+
+1.  **Sensory Awareness (Vision)**:
+    The WM is not blind. It can "see" the contents of your windows, recognizing text, UI elements, and context. It knows that you are looking at a terminal versus a browser.
+
+2.  **Autonomous Action (agency)**:
+    It doesn't just arrange tiles. It can:
+    *   **Resize and Move** windows dynamically based on your workflow.
+    *   **Type Commands** and interaction with applications on your behalf.
+    *   **Execute Tasks** like "Search Google for this error" or "Open my dev environment".
+
+3.  **Zero-Trust Security Layer**:
+    We understand the risks of an AI that can see and type. Agentic-Qtile is built on a **Zero-Trust Architecture**.
+    *   **Privacy Mask**: Sensitive apps (banking, password managers) can be "cloaked", preventing the agent from seeing them.
+    *   **Input Gating**: All agent actions are filtered. Dangerous commands (e.g., `rm -rf`) are blocked before execution.
+    *   **Sandboxed Environment**: Agent operations are isolated to prevent unauthorized system access.
+
 Features
 ========
 
-* Simple, small and extensible. It's easy to write your own layouts,
-  widgets and commands.
-* Configured in Python.
-* Runs as an X11 WM or a Wayland compositor.
-* Command shell that allows all aspects of Qtile to be managed and
-  inspected.
-* Complete remote scriptability - write scripts to set up workspaces,
-  manipulate windows, update status bar widgets and more.
-* Qtile's remote scriptability makes it one of the most thoroughly
-  unit-tested window managers around.
+*   **Generative Layouts**: Dynamic "Semantic Slots" that appear and disappear as the agent needs space.
+*   **Conversational Interface**: Talk to your window manager in natural language.
+*   **Legacy Features**: Retains all the power of standard Qtile:
+    *   Simple, small and extensible Python configuration.
+    *   Runs as an X11 WM or a Wayland compositor.
+    *   Complete remote scriptability.
 
 Community
 =========

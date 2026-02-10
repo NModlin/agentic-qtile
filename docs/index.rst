@@ -5,10 +5,11 @@
 Everything you need to know about AGENTIC-QTILE
 ===============================================
 
-AGENTIC-QTILE is a full-featured, hackable tiling window manager written and configured
-in Python. It is a fork/evolution of **Qtile**, designed for agentic AI integration.
-It's available both as an X11 window manager and also as
-:ref:`a Wayland compositor <wayland>`.
+**AGENTIC-QTILE** is a fork of Qtile designed to be an **AI-Native Window Manager**.
+It works **WITH you**, not just **FOR you**, providing sensory awareness, autonomous
+action, and a zero-trust security layer.
+
+It is available both as an X11 window manager and also as :ref:`a Wayland compositor <wayland>`.
 
 This documentation is designed to help you :doc:`install <manual/install/index>`
 and :doc:`configure <manual/config/index>` Qtile. Once it's up and running you'll

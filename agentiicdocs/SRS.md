@@ -23,10 +23,10 @@ The WM must support a "Draft Mode" where proposed slots are rendered as transpar
 ### FR-7: Preference Feedback Loop
 The WM must correlate manual window moves/slot deletions with specific agent IDs to build a preference model.
 
-## Phase 4: Multi-Agent Swarms
+## Phase 4: Secure Sensory Expansion (Guardrails)
 
-### FR-8: Agent Identity & Ownership
-RPC methods must require an `agent_id` to establish ownership of slots. The WM must track which agent owns which slot (real or ghost) to facilitate multi-agent scenarios.
+### FR-8: Privacy Mask (Vision Security)
+The agent must be prevented from obtaining metadata or screenshots of windows belonging to sensitive applications (e.g., password managers, banking).
 
-### FR-9: Layout Conflict Detection
-The Ghost Slot system must detect and visualize spatial conflicts (overlaps) between proposals from different agents. Conflicting regions should be rendered with a distinct warning style (e.g., red borders) to alert the user before confirmation.
+### FR-9: Input Gating (Action Security)
+All agent-generated input must be scanned for dangerous patterns (e.g., `sudo`, `rm -rf`) before execution. Input injection must be strictly locked to the intended target window to prevent "focus hijacking."

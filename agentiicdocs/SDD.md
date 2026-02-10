@@ -60,15 +60,15 @@ The Orchestrator reads `user_override` events via `get_recent_events()` and inje
 
 ---
 
-## 4. Multi-Agent Swarms (Phase 4)
+## 4. Security Architecture (Guardrails)
 
-### 4.1 Conflict Resolution
-The `GenerativeLayout` implements a naive conflict detection algorithm.
-- Checks intersection between all pairs of ghost slots.
-- Sets `is_conflict=True` on both slots if they overlap.
-- Renders conflicting slots with a distinct visual style (e.g., Red border) to alert the user.
+### 4.1 Vision Security (Privacy Mask)
+The `SecurityPolicy` class maintains a `SENSITIVE_CLASSES` set (e.g., `Bitwarden`, `KeePassXC`).
+- `_rpc_get_windows` iterates through all windows.
+- If `guard.can_see_window(win)` returns `False`, the window is either omitted or verified as `<REDACTED>`.
+- `_rpc_get_screenshot` raises `SecurityViolation` if the target is sensitive.
 
-### 4.2 Agent Ownership and Identity
-- `SemanticSlot` objects now carry an `owner` attribute (string), identifying the agent (e.g., "Browser Agent", "IDE Agent").
-- RPC methods `propose_slot` and `create_slot` accept an optional `owner` parameter.
-- This metadata is used for tracking attribution and for future per-agent preference learning.
+### 4.2 Action Security (Input Gating)
+- **Regex Filter**: `validate_input(text)` scans for patterns like `sudo`, `rm -rf`.
+- **Focus Lock**: `can_inject_input(current, target)` ensures the agent cannot type if the user has shifted focus elsewhere.
+- **Feedback Loop**: `SecurityViolation` exceptions are caught by the Orchestrator and fed back to the LLM to trigger self-correction.
