@@ -39,10 +39,21 @@ class MockIdleInhibitorManager:
     def inhibitors(self):
         return []
 
+class MockContext:
+    def rectangle(self, x, y, w, h):
+        pass
+    def fill(self):
+        pass
+    def stroke(self):
+        pass
+    def set_source_rgba(self, r, g, b, a):
+        pass
+
 class MockDrawer(Drawer):
     def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
+        self._ctx = MockContext()
 
     def finalize(self):
         pass
@@ -64,9 +75,12 @@ class MockDrawer(Drawer):
     def set_source_rgb(self, colour):
         pass
 
+    def set_source_rgba(self, r, g, b, a):
+        pass
+
     @property
     def ctx(self):
-        return None  # Or a mock if needed
+        return self._ctx
 
 
 class MockTextLayout:
@@ -99,12 +113,23 @@ class MockInternal(Internal):
 
     def kill(self):
         pass
+
+    def bring_to_front(self):
+        pass
     
     def hide(self):
         self._mapped = False
 
     def unhide(self):
         self._mapped = True
+
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def height(self):
+        return self._height
 
     def place(self, x, y, width, height, borderwidth, bordercolor, above=False, margin=None, respect_hints=False):
         self.x = x
